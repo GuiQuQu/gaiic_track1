@@ -117,8 +117,10 @@ def train_worker(args):
             os.path.join(args.checkpoint_path,f"epoch_{args.epochs}.pt"))
         
 def predict_workers(args):
-    pass
-
+    if args.test_file is None:
+        print("Error,Check -- test-file {}")
+        return -1
+    
 
 
 def main():

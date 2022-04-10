@@ -4,13 +4,13 @@ import torch
 from transformers import AutoTokenizer,AutoModel
 
 class Model(nn.Module):
-    def __init__(self,model_name="bert-base-chinese",class_num=13,text_ouput_dim=512,dropout=0.25):
+    def __init__(self,model_name="bert-base-chinese",cache_dir="../.cache",class_num=13,text_ouput_dim=512,dropout=0.25):
         super().__init__()
         self.text_ouput_dim = text_ouput_dim
         self.img_output_dim = 256
 
-        self.pre_model = AutoModel.from_pretrained(model_name,cache_dir="../.cache")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name,cache_dir='../.cache')
+        self.pre_model = AutoModel.from_pretrained(model_name,cache_dir=cache_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name,cache_dir=cache_dir)
         self.text_head = nn.Sequential(
             nn.Linear(self.pre_model.config.hidden_size,text_ouput_dim),
             nn.Dropout(p=dropout),

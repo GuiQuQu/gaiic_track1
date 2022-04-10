@@ -31,6 +31,9 @@ def parse_args():
     # predict
     parser.add_argument("--threshold",type=float,default=0.5,help="predict threshold")
     parser.add_argument("--test-file",type=str,default=None,help="test file path")
+
+    # pretrained_model
+    args.add_argument("--cache-dir",type=str,default=None,help ="pretrained model download path")
     # load model and going on train or predict
     parser.add_argument("--resume",type=str,default=None,help="existed model path")
     args.parser.parse_args()
