@@ -2,11 +2,13 @@
 
 # import logging
 # 生产负例
+import argparse
 import json
 import os
 import random
 from tqdm import tqdm
-from replace import replace_entry
+from replace import replace_entry,get_attr_dict
+# from train import setup_seed
 class_name=['图文','领型', '袖长', '衣长', '版型', '裙长', '穿着方式', '类别', '裤型', '裤长', '裤门襟', '闭合方式', '鞋帮高度']
 
 class_dict={'图文':['符合','不符合'],
@@ -29,8 +31,9 @@ class_dict={'图文':['符合','不符合'],
 """
 
 def generate_neg_samples(data_path = "data/train_fine.txt",
-                         res_data_dir = "data/data_with_neg",
-                         attr_replace_p = 0.8):
+                        res_data_dir = "data/data_with_neg",
+                        attr_dict_path = "data/attr_to_attrvals.json",
+                        attr_replace_p = 0.8):
     if not os.path.exists(data_path):
         print("data path not exist")
         return
@@ -43,10 +46,11 @@ def generate_neg_samples(data_path = "data/train_fine.txt",
     texts = []
     neg_cnt = 0
     posi_cnt = 0
+    attr_dict = get_attr_dict(attr_dict_path)
     with open(data_path,"r",encoding="utf-8") as f:
         for line in tqdm(f):
             item_dict = json.loads(line)
-            item_dict = replace_entry(item_dict) # 替换等价但是不同的文字
+            item_dict = replace_entry(item_dict,attr_dict) # 替换等价但是不同的文字
             img_dict[item_dict["img_name"]] = item_dict["feature"]
             match_list = item_dict["match"]
             key_attr_dict = item_dict["key_attr"]
@@ -121,5 +125,15 @@ def generate_neg_samples(data_path = "data/train_fine.txt",
         f.write(json_str)
     print(f"negative sample size:{neg_cnt},positive_sample size:{posi_cnt},ratio:{neg_cnt/posi_cnt:.3f}")
     
-            
+if __name__=='__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument("--seed",type=int,default=None,help="random seed")
+  parser.add_argument("--data-path",type=str,default=None,help="old data path")
+  parser.add_argument("--res-datadir",type=str,default=None,help = "res data will be saved in this dir")
+  parser.add_argument("--attr-dict-path",type=str,default=None,help="attr_to_attrvals.json path")
+  parser.add_argument("--replace-p",type=float,default=0.8,help = "attr replace p")
+  args = parser.parse_args()
+  if args.seed is not None:
+    random.seed(args.seed)
+  generate_neg_samples(args.data_path,args.res_datadir,args.attr_dict_path,args.replace_p)
             
