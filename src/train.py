@@ -23,21 +23,26 @@ def train(data_loader,criterion,model,optimizer,scheduler,epoch,args,tb_writer=N
         tb_writer:tensorboard记录Writer
     """
     model.train()
+    device = args.device
+    num_batch_per_epoch = data_loader.num_batches
     for idx,batch in enumerate(data_loader):
 
         img_features,texts,labels = batch # (bs,2048),dict,(bs,13)
         img_features = img_features.to(args.device)
+        labels = torch.stack(labels,dim=1).to(device)
         texts = {k:v.squeeze(1).to(device) for k,v in texts.items()}
         
-        step = epoch * data_loader.num_batchs + idx
+        step = epoch * data_loader.num_batches + idx
         scheduler(step)
         optimizer.zero_grad()
         
-        logtis = model(img_features,texts)
-        loss = criterion(logtis,labels)
+        logits = model(img_features,texts)
+        # print(logits.shape) # (bs,13)
+        # print(labels.shape) # (bs,13)
+        loss = criterion(logits,labels)
         loss.backward()
         optimizer.step()
-
+        
         if args.log_step > 0 and idx % args.log_step == 0:
             "Train Epoch: 1 [12/123](12%)loss:0.111,"
             percent_complete = 100.0 * idx / num_batch_per_epoch
@@ -75,34 +80,41 @@ def evaluate(data_loader,model,criterion,epoch,args,tb_writer=None):
     num_element = 0
     preds_nums = 0
     pred_true_nums = 0
+    pred_posi_true_nums = 0
+    labels_posi_nums = 0
     with torch.no_grad():
         for batch in data_loader:
             img_features,texts,labels = batch # (bs,2048),dict,(bs,13)
             img_features = img_features.to(args.device)
-            texts = {k:v.squeeze(1).to(device) for k,v in texts.items()}
+            labels = torch.stack(labels,dim=1).to(args.device)
+            texts = {k:v.squeeze(1).to(args.device) for k,v in texts.items()}
             logits = model(img_features,texts) # (bs,class_num)
-            loss = criterion(logtis,labels)
-            cumulative_loss += loss
-            num_element +=data_loader.batch_size
+
+            loss = criterion(logits,labels)
+            total_loss += loss
+            num_element += data_loader.batch_size
             total_loss += loss
 
-            preds = (logits.sigmod() > args.threshold).long() # (bs,class_num)
-            labels = torch.LongTensor(labels) # (bs,class_num)
+            preds = (torch.sigmoid(logits) > args.threshold).long() # (bs,class_num)
+            # labels = torch.LongTensor(labels) # (bs,class_num)
             compare_ans = preds == labels
             preds_nums += compare_ans.shape[0] * compare_ans.shape[1]
             pred_true_nums += torch.sum(compare_ans)
+            labels_posi_nums += torch.sum(labels)
+            pred_posi_true_nums += torch.sum(preds+labels==2)
     
     metrics ={
         "val_loss":total_loss/num_element,
         "val_acc":pred_true_nums/preds_nums,
+        "posi_val_acc": pred_posi_true_nums/labels_posi_nums,
         }
     
-    logging.info("\t".join([f"{name}:{val:.4f}"  for name,val in metrics.tiems()]))
+    logging.info(f"Epoch:{epoch}: "+"\t".join([f"{name}:{val:.4f}"  for name,val in metrics.items()]))
     
     if tb_writer is not None:
         for name,val in metrics.items():
             name ="evaluate/"+name
-            tb_writer.add_scalar(name, scalar_value)
+            tb_writer.add_scalar(name, val)
     
 
 

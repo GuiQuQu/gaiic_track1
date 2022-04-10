@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-
+import logging
 from transformers import AutoTokenizer,AutoModel
 
 class Model(nn.Module):
@@ -15,7 +15,7 @@ class Model(nn.Module):
             nn.Linear(self.pre_model.config.hidden_size,text_ouput_dim),
             nn.Dropout(p=dropout),
         )
-        self.img_model = nn.Sequential(
+        self.img_head = nn.Sequential(
             nn.Linear(2048, 512),
             nn.LeakyReLU(512),
             nn.Dropout(p =dropout),
@@ -39,13 +39,17 @@ class Model(nn.Module):
             
         )
 
-    def forward(self,text_inputs,img_features):
+    def forward(self,img_features,text_inputs):
         """
             text_inputs:dict{"input_ids":Tensor,...}
             img_features: Tensor
         """
-        text_emb = self.text_model(**text_inputs)[0] # (bs,hid_dim) (bs,768)
-        img_emb =self.img_model(img_features) #(bs,hid_dim) (bs,512)
+        text_emb = self.pre_model(**text_inputs)[1] # (bs,hid_dim) (bs,768)
+        # logging.info(f"text_emb:{text_emb.shape}")
+        text_emb = self.text_head(text_emb)
+        # logging.info(f"text_emb:{text_emb.shape}")
+        img_emb =self.img_head(img_features) #(bs,hid_dim) (bs,512)
+        # logging.info(f"img_emb:{img_emb.shape}")
         emd = torch.cat([text_emb,img_emb],dim=1)
         logits = self.classify_head(emd)
         return logits

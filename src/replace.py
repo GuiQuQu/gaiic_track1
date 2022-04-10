@@ -2,9 +2,9 @@
 import json
 import os
 
-def get_attr_dict():
+def get_attr_dict(attr_path):
 
-    attr_path ="data/attr_to_attrvals.json"
+    # attr_path ="data/attr_to_attrvals.json"
 
     if  not os.path.exists(attr_path):
         print("attr_path not exists")
@@ -18,9 +18,9 @@ def get_attr_dict():
     # print(attr_dict)
     return attr_dict
 
-attr_dict = get_attr_dict()
+# attr_dict = get_attr_dict()
 
-def replace_entry(data_entry):
+def replace_entry(data_entry,attr_dict):
     if attr_dict is None:
         raise ValueError("no attr_dict")
     if "key_attr" not in data_entry.keys() or "title" not in data_entry.keys():
