@@ -62,7 +62,7 @@ def train_worker(args):
     #
         
     model =Model()
-    model.to(ars.device)
+    model.to(args.device)
     tokenize = lambda x : model.tokenize(x)
     dls = create_dataloader(args, tokenize)
 

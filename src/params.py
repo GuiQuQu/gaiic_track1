@@ -1,5 +1,11 @@
 import argparse
 
+default_optim_args ={
+    "lr":1e-4,
+    "beta1":0.9,
+    "beta2":0.999,
+    "eps":1e-8,
+}
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -23,7 +29,7 @@ def parse_args():
 
     # optimizer
     parser.add_argument("--lr",type=float,default=None,help="learning rate")
-    parse.add_argument("--beta1",type=float,default=None,help="AdamW beta1")
+    parser.add_argument("--beta1",type=float,default=None,help="AdamW beta1")
     parser.add_argument("--beta2",type=float,default=None,help="AdamW beta2")
     parser.add_argument("--eps",type=float,default=None,help="AdamW eps")
     parser.add_argument("--warmup",type=float,default=None,help="warmup length")
@@ -38,7 +44,8 @@ def parse_args():
     parser.add_argument("--resume",type=str,default=None,help="existed model path")
     args.parser.parse_args()
 
-
-   
+    for name,val in default_optim_args:
+        if getattr(args, name) is None:
+            setattr(args, name, val)
     
     return args
