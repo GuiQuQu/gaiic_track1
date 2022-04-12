@@ -18,6 +18,8 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 from torch import optim
 
+import numpy as np
+
 
 def train_worker(args):
     if args.is_train is False:
@@ -101,7 +103,7 @@ def train_worker(args):
             start_epoch = checkpoint["epoch"]
             logging.info(f"=> loaded checkpoint '{args.resume}' (epoch {checkpoint['epoch']})")
 
-    tb_writer =None
+    tb_writer = None
     if args.tb:
         tb_writer = SummaryWriter(args.tensorboard_path)  
 
@@ -144,14 +146,21 @@ def predict_workers(args):
         print("Error,Check --pred-res-path {} ")
     if args.seed is not None:
         setup_seed(args.seed)
-    #
+
+    log_dir = os.path.join(".","preds")
+    if  not os.path.exists(log_dir):
+        os.makedirs(log_dir,exist_ok=True)
+    log_file = os.path.join("preds","pred.log")
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    set_logger(log_file, log_level)    
+
+    logging.info(f"Use {args.device} to predict")
     if args.cache_dir is not None:
       model = Model(cache_dir=args.cache_dir)
     else:
       model = Model()
     model.to(args.device)
     tokenize = lambda x : model.tokenize(x)
-    
     
     if args.resume:
         if os.path.isfile(args.resume):
@@ -160,31 +169,31 @@ def predict_workers(args):
             model.to(args.device)
             start_epoch = checkpoint["epoch"]
             logging.info(f"=> loaded checkpoint '{args.resume}' (epoch {checkpoint['epoch']})")
-    
-    dls,idx_2_class = create_dataloader(args, tokenize)
-    model.eval()
-    data_loader = dls["test"]
-    
-    pred_result = []
-    with torch.no_grad():
-        for batch in tqdm(data_loader):
-            img_names,img_features,texts,need_querys = batch  # need_query (13,3)
-            img_features = img_features.to(args.device)
-            texts = {k:v.squeeze(1).to(args.device) for k,v in texts.items()}
-            logits = model(img_features,texts) # (bs,class_num)
-            need_querys = torch.stack(need_querys).T.detach().cpu().tolist()
-            preds = (torch.sigmoid(logits) > args.threshold).long() # (bs,class_num)
-            preds = preds.detach().cpu().tolist()
-            for img_name,need_query,pred_res in zip(img_names,need_querys,preds):
-                match = {}
-                for idx,tmp in enumerate(zip(need_query,pred_res)):
-                    q,pred = tmp
-                    if q==1:
-                        match[idx_2_class[idx]] = 0
-                pred_result.append({"img_name":img_name,"match":match})
 
+    with open(args.class_map,"r",encoding="utf-8") as f:
+        idx2class = json.loads(f.read())    
+    class2idx = {v:int(k) for k,v in idx2class.items()}
+    preds_res = []
+    model.eval()
+    with torch.no_grad():
+        with open(args.test_file,"r",encoding="utf-8") as f:
+            for line in tqdm(f):
+                item = json.loads(line)
+                img_name = item["img_name"]
+                query = item["query"]
+                img_features = torch.from_numpy(np.array(item["feature"]).astype(np.float32)).view(1,-1).to(args.device) # (1,2048)
+                texts = tokenize(item["title"])
+                texts = {k:v.to(args.device) for k,v in texts.items()}
+                logits = model(img_features,texts) # (bs,class_num)
+                preds = (torch.sigmoid(logits) > args.threshold).long().squeeze(0) # (1,13)
+                preds = preds.detach().cpu().tolist()
+                match = {}
+                for q in query:
+                    match[q] = preds[class2idx[q]]
+                preds_res.append({"img_name":img_name,"match":match})
+            
     with open(args.pred_res_path,"w",encoding="utf-8") as f:
-        for result in pred_result:
+        for result in preds_res:
             json_str = json.dumps(result,ensure_ascii=False)
             f.write(json_str)
             f.write("\n")
