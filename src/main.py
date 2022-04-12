@@ -105,8 +105,8 @@ def train_worker(args):
     criterion = torch.nn.MultiLabelSoftMarginLoss()
 
     for epoch in range(start_epoch,args.epochs):
-        # train(dls["train"],criterion,model,optimizer,scheduler,epoch,args,tb_writer)
-        # evaluate(dls["eval"],model,criterion,epoch,args,tb_writer)
+        train(dls["train"],criterion,model,optimizer,scheduler,epoch,args,tb_writer)
+        evaluate(dls["eval"],model,criterion,epoch,args,tb_writer)
         # save checkpoint
         if args.save_frequency > 0 and (epoch + 1) % args.save_frequency == 0:
             torch.save({
