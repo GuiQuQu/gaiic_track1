@@ -36,7 +36,6 @@ class Model(nn.Module):
             # nn.LeakyReLU(self.output_dim),
             # nn.Dropout(p =dropout),
             nn.Linear(self.output_dim, class_num)
-            
         )
 
     def forward(self,img_features,text_inputs):
