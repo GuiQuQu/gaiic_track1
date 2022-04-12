@@ -36,6 +36,37 @@ class TrainDataSet(Dataset):
         return torch.from_numpy(img_feature),self.tokenize(title),label
 
 
+class TestDataSet(Dataset):
+    def __init__(self,test_file_path,class_map_path,tokenize):
+        self.items = []
+        self.tokenize = tokenize 
+        with open(class_map_path,"r",encoding="utf-8") as f:
+            tmp = json.loads(f.read()) # idx->class_num
+            self.idx_2_class = {int(k):v for k,v in tmp.items()}
+        # self.class_2_idx = {v:k for k,v in self.idx_2_class}
+        with open(test_file_path,"r",encoding="utf-8") as f:
+            for line in f:
+                self.items.append(json.loads(line))
+                
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self,idx): # (bs,2048) dict [[...],[...]]
+        title = self.items[idx]["title"]
+        query = self.items[idx]["query"]
+        img_feature = np.array(self.items[idx]["feature"]).astype(np.float32)
+        img_name = self.items[idx]["img_name"]
+        need_query = [] # 存在该query加1,不存在加0
+        query = set(query)
+        for idx,class_name in self.idx_2_class.items():
+            if class_name in query:
+                need_query.append(1)
+            else:
+                need_query.append(0)
+        return img_name,torch.from_numpy(img_feature),self.tokenize(title),need_query
+
+
+
 def create_dataloader(args,tokenize):
     """
         args.train_dir
@@ -60,8 +91,15 @@ def create_dataloader(args,tokenize):
             dl.num_batches = len(dl)
         return dls
     else:
-        pass
         # 加载测试数据集或者评测数据集
-
+        test_file_path = args.test_file
+        class_map_path =args.class_map
+        test_dataset =TestDataSet(test_file_path, class_map_path, tokenize)
+        dls = {
+            "test":DataLoader(test_dataset,batch_size=args.batch_size,shuffle=False,num_workers=args.workers,pin_memory=True,drop_last=False)
+        }
+        for k,dl in dls.items():
+            dl.num_batches =len (dl)
+        return dls,test_dataset.idx_2_class
 
 

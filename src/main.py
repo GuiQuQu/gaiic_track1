@@ -2,8 +2,10 @@
 
 from time import gmtime,strftime
 import os
+import json
 
 import logging
+from tqdm import tqdm
 
 from train import setup_seed,train,evaluate
 from model import Model
@@ -65,6 +67,7 @@ def train_worker(args):
         for name in sorted(vars(args)):
             val = getattr(args, name)
             f.write(f"{name}: {val}\n")
+
     if args.seed is not None:
         setup_seed(args.seed)
     #
@@ -128,12 +131,63 @@ def train_worker(args):
         
 def predict_workers(args):
 
-    if args.test_file is None:
-        print("Error,Check -- test-file {}")
+    if args.test_file is None or args.class_map is None:
+        print("Error,Check --test-file {} --class-map {}")
         return -1
     if args.is_train is True:
-      print("please set --is-train {} is False")
-      return -1
+        print("please set --is-train {} is False")
+        return -1
+    if args.resume is None:
+        print("Error,Check --resume {} ")
+        return -1
+    if args.pred_res_path is None:
+        print("Error,Check --pred-res-path {} ")
+    if args.seed is not None:
+        setup_seed(args.seed)
+    #
+    if args.cache_dir is not None:
+      model = Model(cache_dir=args.cache_dir)
+    else:
+      model = Model()
+    model.to(args.device)
+    tokenize = lambda x : model.tokenize(x)
+    
+    
+    if args.resume:
+        if os.path.isfile(args.resume):
+            checkpoint = torch.load(args.resume)
+            model.load_state_dict(checkpoint["state_dict"])
+            model.to(args.device)
+            start_epoch = checkpoint["epoch"]
+            logging.info(f"=> loaded checkpoint '{args.resume}' (epoch {checkpoint['epoch']})")
+    
+    dls,idx_2_class = create_dataloader(args, tokenize)
+    model.eval()
+    data_loader = dls["test"]
+    
+    pred_result = []
+    with torch.no_grad():
+        for batch in tqdm(data_loader):
+            img_names,img_features,texts,need_querys = batch  # need_query (13,3)
+            img_features = img_features.to(args.device)
+            texts = {k:v.squeeze(1).to(args.device) for k,v in texts.items()}
+            logits = model(img_features,texts) # (bs,class_num)
+            need_querys = torch.stack(need_querys).T.detach().cpu().tolist()
+            preds = (torch.sigmoid(logits) > args.threshold).long() # (bs,class_num)
+            preds = preds.detach().cpu().tolist()
+            for img_name,need_query,pred_res in zip(img_names,need_querys,preds):
+                match = {}
+                for idx,tmp in enumerate(zip(need_query,pred_res)):
+                    q,pred = tmp
+                    if q==1:
+                        match[idx_2_class[idx]] = 0
+                pred_result.append({"img_name":img_name,"match":match})
+
+    with open(args.pred_res_path,"w",encoding="utf-8") as f:
+        for result in pred_result:
+            json_str = json.dumps(result,ensure_ascii=False)
+            f.write(json_str)
+            f.write("\n")
 
 def main():
     args = parse_args()
