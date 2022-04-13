@@ -83,8 +83,8 @@ def create_dataloader(args,tokenize):
         eval_len = len(dataset) - train_len
         train_ds,eval_ds = random_split(dataset, [train_len,eval_len])
         dls = {
-            "train":DataLoader(train_ds,batch_size = args.batch_size,shuffle=True, num_workers=args.workers,pin_memory=True,drop_last=True),
-            "eval":DataLoader(eval_ds,batch_size = args.batch_size,shuffle=False, num_workers=args.workers,pin_memory=True,drop_last=True)
+            "train":DataLoader(train_ds,batch_size = args.batch_size,shuffle=True, num_workers=args.workers,pin_memory=False,drop_last=True),
+            "eval":DataLoader(eval_ds,batch_size = args.batch_size,shuffle=False, num_workers=args.workers,pin_memory=False,drop_last=True)
         }
         for k,dl in dls.items():
             dl.num_samples = len(dataset)

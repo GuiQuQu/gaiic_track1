@@ -91,10 +91,10 @@ def train_worker(args):
         betas=(args.beta1,args.beta2),
         eps=args.eps)
     steps = args.epochs * dls["train"].num_batches
-    if aegs.warmup is not None:
+    if args.warmup is not None:
         scheduler = consine_lr(optimizer, args.lr, args.warmup, steps)
     else:
-        scheduler =optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=2,T_mult=2,eta_min=5e-6,last_epoch=-1)
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=2,T_mult=2,eta_min=5e-6,last_epoch=-1)
     start_epoch = 0
     if args.resume:
         if os.path.isfile(args.resume):

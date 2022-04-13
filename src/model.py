@@ -29,8 +29,8 @@ from transformers import AutoTokenizer,AutoModel
 #         self.output_dim = 512
 #         self.classify_head = nn.Sequential(  # 分类头
 #             nn.Linear(self.cat_dim, self.output_dim),
-#             nn.BatchNorm1d(self.output_dim),
-#             nn.LeakyReLU(self.output_dim),
+#             # nn.BatchNorm1d(self.output_dim),
+#             # nn.LeakyReLU(self.output_dim),
 #             nn.Dropout(p = dropout),
 
 #             # nn.Linear(512,self.output_dim),
@@ -67,17 +67,26 @@ class Model(nn.Module):
         self.pre_model = AutoModel.from_pretrained(model_name,cache_dir=cache_dir)  # bert
         self.tokenizer = AutoTokenizer.from_pretrained(model_name,cache_dir=cache_dir)
 
-        self.text_ouput_dim = self.pre_model.config.hidden_size
-        self.img_output_dim = 2048
-
-        self.cat_dim = self.text_ouput_dim + self.img_output_dim
-
+        # self.text_output_dim = self.pre_model.config.hidden_size
+        self.text_output_dim = 512
+        self.text_head = nn.Sequential(
+          nn.Linear(self.pre_model.config.hidden_size,self.text_output_dim),
+          nn.Dropout(p=dropout)
+        )
+        self.img_head = nn.Sequential(
+          nn.Linear(2048,512),
+          nn.Dropout(p=dropout),
+          nn.Linear(512,256),
+          nn.Dropout(p=dropout),
+        )
+        self.img_output_dim = 256
+        self.cat_dim = self.text_output_dim + self.img_output_dim # 512 + 256
+        self.output_dim = 512
         self.classify_head = nn.Sequential(  # 分类头
             nn.Linear(self.cat_dim, self.output_dim),
             nn.Dropout(p = dropout),
             nn.Linear(self.output_dim, class_num)
         )
-
     def forward(self,img_features,text_inputs):
         """
             text_inputs:dict{"input_ids":Tensor,...}
@@ -85,9 +94,10 @@ class Model(nn.Module):
         """
         text_emb = self.pre_model(**text_inputs)[1] # (bs,hid_dim) (bs,768)
         # logging.info(f"text_emb:{text_emb.shape}")
-        # text_emb = self.text_head(text_emb)
+        text_emb = self.text_head(text_emb)
         # logging.info(f"text_emb:{text_emb.shape}")
-        # img_emb =self.img_head(img_features) #(bs,hid_dim) (bs,512)
+        img_emb = self.img_head(img_features) #(bs,hid_dim) (bs,512)
+        # img_emb = img_features
         # logging.info(f"img_emb:{img_emb.shape}")
         emd = torch.cat([text_emb,img_emb],dim=1)
         logits = self.classify_head(emd)
