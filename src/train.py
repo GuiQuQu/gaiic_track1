@@ -76,12 +76,12 @@ def evaluate(data_loader,model,criterion,epoch,args,tb_writer=None):
         2. 预测准确率
     """
     model.eval()
-    total_loss = 0
-    num_element = 0
-    preds_nums = 0
-    pred_true_nums = 0
-    pred_posi_true_nums = 0
-    labels_posi_nums = 0
+    total_loss = 0  # 所有batch的loss和
+    # num_element = 0
+    preds_nums = 0 # 总共进行的预测的个数
+    pred_true_nums = 0 # 所有真实标签结果为1的分类标签的个数
+    pred_posi_true_nums = 0 # 真实标签为1,预测结果也为1的预测个数
+    labels_posi_nums = 0 # 
     with torch.no_grad():
         for batch in data_loader:
             img_features,texts,labels = batch # (bs,2048),dict,(bs,13)
@@ -92,7 +92,7 @@ def evaluate(data_loader,model,criterion,epoch,args,tb_writer=None):
 
             loss = criterion(logits,labels)
             total_loss += loss
-            num_element += data_loader.batch_size
+            # num_element += data_loader.batch_size
             total_loss += loss
 
             preds = (torch.sigmoid(logits) > args.threshold).long() # (bs,class_num)
@@ -104,7 +104,7 @@ def evaluate(data_loader,model,criterion,epoch,args,tb_writer=None):
             pred_posi_true_nums += torch.sum(preds+labels==2)
     
     metrics ={
-        "val_loss":total_loss/num_element,
+        "val_loss":total_loss/data_loader.num_batches,
         "val_acc":pred_true_nums/preds_nums,
         "posi_val_acc": pred_posi_true_nums/labels_posi_nums,
         }
