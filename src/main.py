@@ -6,7 +6,6 @@ import json
 
 import logging
 from tqdm import tqdm
-
 from train import setup_seed,train,evaluate
 from model import Model
 from dataset import create_dataloader
@@ -17,7 +16,7 @@ from scheduler import consine_lr
 from torch.utils.tensorboard import SummaryWriter
 import torch
 from torch import optim
-
+from torch.cuda.amp import GradScaler
 import numpy as np
 
 
@@ -95,6 +94,11 @@ def train_worker(args):
         scheduler = consine_lr(optimizer, args.lr, args.warmup, steps)
     else:
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,T_0=2,T_mult=2,eta_min=5e-6,last_epoch=-1)
+    
+    scaler = None
+    if args.amp:
+        scaler = GradScaler()
+    
     start_epoch = 0
     if args.resume:
         if os.path.isfile(args.resume):
@@ -112,7 +116,7 @@ def train_worker(args):
     criterion = torch.nn.MultiLabelSoftMarginLoss()
 
     for epoch in range(start_epoch,args.epochs):
-        train(dls["train"],criterion,model,optimizer,scheduler,epoch,args,tb_writer)
+        train(dls["train"],criterion,model,optimizer,scheduler,scaler,epoch,args,tb_writer)
         evaluate(dls["eval"],model,criterion,epoch,args,tb_writer)
         # save checkpoint
         if args.save_frequency > 0 and (epoch + 1) % args.save_frequency == 0:

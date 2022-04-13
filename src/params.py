@@ -47,6 +47,9 @@ def parse_args():
     parser.add_argument("--cache-dir",type=str,default=None,help ="pretrained model download path")
     # load model and going on train or predict
     parser.add_argument("--resume",type=str,default=None,help="existed model path")
+   
+    # amp
+    parser.add_argument("--amp",action="store_true",help="amp")
     args = parser.parse_args()
 
     for name,val in default_optim_args.items():

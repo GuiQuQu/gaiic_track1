@@ -1,4 +1,5 @@
 import torch
+from torch.cuda.amp import autocast as autocast
 import logging
 from model import Model
 import numpy as np
@@ -12,12 +13,13 @@ def setup_seed(seed):
      torch.backends.cudnn.deterministic = True
 
 
-def train(data_loader,criterion,model,optimizer,scheduler,epoch,args,tb_writer=None):
+def train(data_loader,criterion,model,optimizer,scheduler,scaler,epoch,args,tb_writer=None):
     """
         data_loader: train_dataloader
         model:训练的模型
         optimizer:优化器
         scheduler:调整学习率的优化器
+        scaler:混合精度训练模型
         epoch:这次训练的epoch
         args:参数解析器
         tb_writer:tensorboard记录Writer
@@ -35,13 +37,19 @@ def train(data_loader,criterion,model,optimizer,scheduler,epoch,args,tb_writer=N
         step = epoch * data_loader.num_batches + idx
         scheduler(step)
         optimizer.zero_grad()
-        
-        logits = model(img_features,texts)
-        # print(logits.shape) # (bs,13)
-        # print(labels.shape) # (bs,13)
-        loss = criterion(logits,labels)
-        loss.backward()
-        optimizer.step()
+        # 混合精度训练
+        if args.device.startswith("cuda") and scaler is not None:
+            with autocast():
+                logits = model(img_features,texts)
+                loss = criterion(logits,labels)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else: # float32精度训练
+            logits = model(img_features,texts)
+            loss = criterion(logits,labels)
+            loss.backward()
+            optimizer.step()
         
         if args.log_step > 0 and idx % args.log_step == 0:
             "Train Epoch: 1 [12/123](12%)loss:0.111,"
